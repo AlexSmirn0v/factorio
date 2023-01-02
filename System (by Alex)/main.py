@@ -18,7 +18,7 @@ accent_color = pygame.Color('white')
 size = WIDTH, HEIGHT = 1000, 700
 screen = pygame.display.set_mode(size)
 clock = pygame.time.Clock()
-pygame.display.set_caption('''Labtorio''')
+pygame.display.set_caption('''Laboratorio''')
 
 
 def load_image(name, colorkey=None):
@@ -36,6 +36,9 @@ def load_image(name, colorkey=None):
     else:
         image = image.convert_alpha()
     return image
+
+
+image = load_image(os.path.join('..', 'Design (by Egor)', 'Big_logo.png'))
 
 
 def terminate():
@@ -69,8 +72,153 @@ def copyright(screen):
     screen.blit(year, year_rect)
 
 
+def generate_board():
+    board = [[Resource(CONVERTER['forest'], 5000) for _ in range(1000)] for _ in range(1000)]
+    return board
+
+
+def bubble_window(data:dict):
+    while pygame.event.wait().type not in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
+        b_width, b_height = WIDTH // 3, HEIGHT // 3
+        bubble = pygame.Surface((b_width, b_height))
+        bubble.fill(back_color)
+        pygame.draw.rect(bubble, text_color, (0, 0, WIDTH // 3, HEIGHT // 3), 1, 3)
+        text_coord = 20
+        for key in data.keys():
+            string_rendered = subheader.render(f'{key}: {data[key]}', 1, text_color)
+            rectangle = string_rendered.get_rect()
+            text_coord += 10
+            rectangle.top = text_coord
+            rectangle.x = 20
+            text_coord += rectangle.height
+            bubble.blit(string_rendered, rectangle)
+
+        screen.blit(bubble, (centered(b_width), centered(b_height, HEIGHT)))
+        pygame.display.flip()
+    screen.fill(back_color)
+    pygame.display.flip()
+    
+
+def left_panel(screen: pygame.Surface, pan_status: list=[False, False, False]):
+    titles = ["Фабрика", "Шахта", "Труба"]
+    panels = list()
+    pan_height, pan_width = (HEIGHT - 50) // 3, WIDTH - HEIGHT + 80
+    for i in range(3):
+        a = pygame.Surface((pan_width, pan_height))
+        panels.append(a)
+        if pan_status[i]:
+            a.fill(accent_color)
+        else:
+            a.fill(back_color)
+        
+        string_rendered = subheader.render(titles[i], 1, text_color)
+        rectangle = string_rendered.get_rect()
+        rectangle.top = centered(rectangle.y, pan_height)
+        rectangle.x = 10
+        a.blit(string_rendered, rectangle)
+
+        image1 = pygame.transform.scale(image, (pan_height, pan_height))
+        a.blit(image1, (pan_width - pan_height, 0))
+
+        screen.blit(a, (0, i * pan_height + 10))
+
+
+def main_window(isNew=True):
+    screen.fill(back_color)
+    UPDATER =  pygame.USEREVENT + 1
+    pygame.time.set_timer(UPDATER, 1000)
+    if isNew:
+        board = generate_board()
+    else:
+        board = list()
+        with open("board.csv", encoding='utf8') as file:
+            reader = csv.reader(file, delimiter=';', quotechar='"')
+            for row in reader:
+                temp_keep = list()
+                line = list()
+                for element in row:
+                    if len(temp_keep) != 3:
+                        temp_keep.append(element)
+                    else:
+                        line.append(CONVERTER[int(temp_keep[0])](int(temp_keep[1]), int(temp_keep[2])))
+                board.append(line)
+    
+    square_side = HEIGHT - 100
+    square = pygame.Surface((square_side, square_side))
+    square.fill(accent_color)
+    l, d = 490, 490
+    r, u = 510, 510
+    ticker = 0
+    pan_status = [False, False, False]
+    while True:
+        koef = (r - l) // 20 + 1
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.MOUSEWHEEL:
+                l1 = l + event.y * koef
+                r1 = r - event.y * koef
+                d1 = d + event.y * koef
+                u1 = u - event.y * koef
+                if 0 <= l1 <= r1 - 4 and 0 <= d1 <= u1 - 4 and r1 <= 1000 and u1 <= 1000:
+                    l, r, d, u = l1, r1, d1, u1
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == pygame.BUTTON_LEFT:
+                x, y = event.pos
+                if WIDTH - square_side - 10 <= x <= WIDTH - 10 and HEIGHT - 40 - square_side <= y <= HEIGHT - 40:
+                    bubble_window(board[y // square_side][x // square_side].status())
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT and l - koef >= 0:
+                    l -= koef
+                    r -= koef
+                elif event.key == pygame.K_RIGHT and r + koef <= 1000:
+                    l += koef
+                    r += koef
+                elif event.key == pygame.K_DOWN and d - koef >= 0:
+                    d -= koef
+                    u -= koef
+                elif event.key == pygame.K_UP and u + koef <= 1000:
+                    d += koef 
+                    u += koef 
+                print(l, r, d, u)
+            elif event.type == pygame.MOUSEMOTION:
+                x, y = event.pos
+                if 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 20:
+                    which_pan = (y - 10) // ((HEIGHT - 50) // 3)
+                    pan_status[which_pan] = True
+                    for pan in range(len(pan_status)):
+                        if pan != which_pan:
+                            pan_status[pan] = False
+                else:
+                    pan_status = [False, False, False]
+            elif event.type == UPDATER:
+                for i in range(1000):
+                    for j in range(1000):
+                        board[i][j].update(ticker)
+                print(ticker)
+                ticker += 1
+        left_panel(screen, pan_status)
+        copyright(screen)
+        length = r - l
+        base_size = square_side // length + 1
+        for line in range(d, u):
+            for column in range(l, r):
+                unit = board[line][column]
+                '''if unit.type() == CONVERTER['resource']:
+                    image = load_image(f'.\Design (by Egor)\{unit.resource()}.png')
+                else:
+                    image = load_image(f'.\Design (by Egor)\{unit.type()}.png')'''
+                color = (255 // (column - l + 1), 255 // (u - line), 100)
+                imager = pygame.Surface((100, 100))
+                imager.fill(pygame.Color(color))
+                image1 = pygame.transform.scale(image, (base_size, base_size))
+                square.blit(image1, ((column - l) * base_size, (u - line - 1) * base_size))
+        
+        screen.blit(square, (WIDTH - square_side - 10, HEIGHT - 40 - square_side))
+        pygame.display.flip()
+
+
 def start_screen(back_name=None):
-    intro_text = ["Добро пожаловать в Labtorio", "",
+    intro_text = ["Добро пожаловать в Laboratorio", "",
                   "Начать новую игру",
                   "Продолжить играть"]
     if back_name:
@@ -126,123 +274,6 @@ def start_screen(back_name=None):
         copyright(screen)
         pygame.display.flip()
         clock.tick(50)
-
-
-def generate_board():
-    board = [[Resource(CONVERTER['forest'], 5000) for i in range(1000)] for j in range(1000)]
-    return board
-
-
-def bubble_window(data:dict):
-    while pygame.event.wait().type not in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
-        b_width, b_height = WIDTH // 3, HEIGHT // 3
-        bubble = pygame.Surface((b_width, b_height))
-        bubble.fill(back_color)
-        pygame.draw.rect(bubble, text_color, (0, 0, WIDTH // 3, HEIGHT // 3), 1, 3)
-        text_coord = 20
-        for key in data.keys():
-            string_rendered = subheader.render(f'{key}: {data[key]}', 1, text_color)
-            rectangle = string_rendered.get_rect()
-            text_coord += 10
-            rectangle.top = text_coord
-            rectangle.x = 20
-            text_coord += rectangle.height
-            bubble.blit(string_rendered, rectangle)
-
-        screen.blit(bubble, (centered(b_width), centered(b_height, HEIGHT)))
-        pygame.display.flip()
-    screen.fill(back_color)
-    pygame.display.flip()
-    
-
-
-def main_window(isNew=True):
-    path = os.path.join('..', 'Design (by Egor)', 'Big_logo.png')
-    print(path)
-    image = load_image(path)
-    screen.fill(back_color)
-    UPDATER =  pygame.USEREVENT + 1
-    pygame.time.set_timer(UPDATER, 1000)
-    if isNew:
-        print('new')
-        board = generate_board()
-    else:
-        print('old')
-        board = list()
-        with open("board.csv", encoding='utf8') as file:
-            reader = csv.reader(file, delimiter=';', quotechar='"')
-            for row in reader:
-                temp_keep = list()
-                line = list()
-                for element in row:
-                    if len(temp_keep) != 3:
-                        temp_keep.append(element)
-                    else:
-                        line.append(CONVERTER[int(temp_keep[0])](int(temp_keep[1]), int(temp_keep[2])))
-                board.append(line)
-    
-    square_side = HEIGHT - 100
-    square = pygame.Surface((square_side, square_side))
-    square.fill(accent_color)
-    l, d = 490, 490
-    r, u = 510, 510
-    ticker = 0
-
-    while True:
-        koef = (r - l) // 20 + 1
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                terminate()
-            elif event.type == pygame.MOUSEWHEEL:
-                l1 = l + event.y * koef
-                r1 = r - event.y * koef
-                d1 = d + event.y * koef
-                u1 = u - event.y * koef
-                if 0 <= l1 <= r1 - 4 and 0 <= d1 <= u1 - 4 and r1 <= 1000 and u1 <= 1000:
-                    l, r, d, u = l1, r1, d1, u1
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == pygame.BUTTON_LEFT:
-                x, y = event.pos
-                if WIDTH - square_side - 10 <= x <= WIDTH - 10 and HEIGHT - 40 - square_side <= y <= HEIGHT - 40:
-                    bubble_window(board[y // square_side][x // square_side].status())
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT and l - koef >= 0:
-                    l -= koef
-                    r -= koef
-                elif event.key == pygame.K_RIGHT and r + koef <= 1000:
-                    l += koef
-                    r += koef
-                elif event.key == pygame.K_DOWN and d - koef >= 0:
-                    d -= koef
-                    u -= koef
-                elif event.key == pygame.K_UP and u + koef <= 1000:
-                    d += koef 
-                    u += koef 
-                print(l, r, d, u)
-            elif event.type == UPDATER:
-                for i in range(1000):
-                    for j in range(1000):
-                        board[i][j].update(ticker)
-                print(ticker)
-                ticker += 1
-        length = r - l
-        base_size = square_side // length + 1
-        square.fill(pygame.Color('red'))
-        for line in range(d, u):
-            for column in range(l, r):
-                unit = board[line][column]
-                '''if unit.type() == CONVERTER['resource']:
-                    image = load_image(f'.\Design (by Egor)\{unit.resource()}.png')
-                else:
-                    image = load_image(f'.\Design (by Egor)\{unit.type()}.png')'''
-                color = (255 // (column - l + 1), 255 // (u - line), 100)
-                imager = pygame.Surface((100, 100))
-                imager.fill(pygame.Color(color))
-                image1 = pygame.transform.scale(image, (base_size, base_size))
-                square.blit(image1, ((column - l) * base_size, (u - line - 1) * base_size))
-        
-        screen.blit(square, (WIDTH - square_side - 10, HEIGHT - 40 - square_side))
-        pygame.display.flip()
-        copyright(screen)
 
 
 start_screen()
