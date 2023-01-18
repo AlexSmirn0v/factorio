@@ -6,7 +6,7 @@ import random
 import csv
 
 pygame.font.init()
-font_loc = os.path.join('.', 'Design (by Egor)', 'PressStart2P-Regular.ttf')
+font_loc = os.path.join(os.getcwd(), 'Design (by Egor)', 'PressStart2P-Regular.ttf')
 header = pygame.font.Font(font_loc, 20)
 subheader = pygame.font.Font(font_loc, 15)
 main_text = pygame.font.Font(font_loc, 10)
@@ -22,7 +22,7 @@ pygame.display.set_caption('''Laboratorio''')
 
 
 def load_image(name, colorkey=None):
-    fullname = os.path.join('.', 'Design (by Egor)', name)
+    fullname = os.path.join(os.getcwd(), 'Design (by Egor)', name)
     # если файл не существует, то выходим
     if not os.path.isfile(fullname):
         print(f"Файл с изображением '{fullname}' не найден")
@@ -38,7 +38,7 @@ def load_image(name, colorkey=None):
     return image
 
 
-image = load_image(os.path.join('..', 'Design (by Egor)', 'Big_logo.png'))
+image = load_image('Big_logo.png')
 
 
 def terminate():
@@ -150,6 +150,7 @@ def main_window(isNew=True):
     r, u = 510, 510
     ticker = 0
     pan_status = [False, False, False]
+    pan_chosen = '0'
     while True:
         koef = (r - l) // 20 + 1
         for event in pygame.event.get():
@@ -166,6 +167,13 @@ def main_window(isNew=True):
                 x, y = event.pos
                 if WIDTH - square_side - 10 <= x <= WIDTH - 10 and HEIGHT - 40 - square_side <= y <= HEIGHT - 40:
                     bubble_window(board[y // square_side][x // square_side].status())
+                elif 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 50:
+                    which_pan = (y - 10) // ((HEIGHT - 50) // 3)
+                    pan_status[which_pan] = True
+                    if which_pan == pan_chosen:
+                        pan_chosen = '0'
+                    else:
+                        pan_chosen = which_pan
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT and l - koef >= 0:
                     l -= koef
@@ -182,14 +190,16 @@ def main_window(isNew=True):
                 print(l, r, d, u)
             elif event.type == pygame.MOUSEMOTION:
                 x, y = event.pos
-                if 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 20:
+                if 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 50:
                     which_pan = (y - 10) // ((HEIGHT - 50) // 3)
                     pan_status[which_pan] = True
                     for pan in range(len(pan_status)):
-                        if pan != which_pan:
+                        if pan != which_pan and  pan != pan_chosen:
                             pan_status[pan] = False
                 else:
                     pan_status = [False, False, False]
+                    if type(pan_chosen) == int:
+                        pan_status[pan_chosen] = True
             elif event.type == UPDATER:
                 for i in range(1000):
                     for j in range(1000):
@@ -215,6 +225,7 @@ def main_window(isNew=True):
         
         screen.blit(square, (WIDTH - square_side - 10, HEIGHT - 40 - square_side))
         pygame.display.flip()
+        clock.tick(20)
 
 
 def start_screen(back_name=None):
@@ -273,7 +284,7 @@ def start_screen(back_name=None):
             screen.blit(string_rendered, rectangle)
         copyright(screen)
         pygame.display.flip()
-        clock.tick(50)
+        clock.tick(20)
 
 
 start_screen()
