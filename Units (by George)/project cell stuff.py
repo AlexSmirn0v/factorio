@@ -5,6 +5,12 @@ if __name__ == '__main__':
     size = 800, 800
     screen = pygame.display.set_mode(size)
 
+    board = [[[0, 0], [0, 0]],
+             [0, 0], [0, 0],
+             [0, 0], [0, 0],
+             [0, 0], [0, 0],
+             [0, 0], [0, 0]]
+
 
     class Board:
         def __init__(self, width, height):
@@ -67,57 +73,60 @@ if __name__ == '__main__':
     #                     print("poop")
 
     class Resource:
-        def __init__(self, type, resamount):
+        def __init__(self, pos, type, resamount):
             self.type = type
+            self.pos = pos
             self.resamount = resamount
             self.status = (type, resamount)
-
-        def subtract_resource(self, amount):
-            self.resamount -= amount
 
         def return_status(self):
             return self.status
 
         def empty(self):
             pass
-            #изменяет текстурку когда ресурс исчерпан и делает обычной землей?
+            # изменяет текстурку когда ресурс исчерпан и делает обычной землей?
 
         def update(self):
             pass
+
 
 
     class Factory:
-        def __init__(self, minerpos, type):
+        def __init__(self, pos, minerpos, type):
             self.miners = minerpos
             self.type = type
-            # тут тоже, мне нужно додумать как толком обращатся к полю  обращение к словарям
+            self.pos = pos
+            self.miner_stats = board[minerpos[1]][minerpos[0]]
+            # тут тоже, мне нужно додумать как толком обращатся к словарям
 
         def return_status(self):
-            # return status
-            pass
+            return self.miner_stats
 
         def update(self):
-            pass
+            board[self.miners[1]][self.miners[0]][0] -=1 #тут будет из словаря брать сколько нужно материала
 
 
     class Miner:
-        def __init__(self, respos, type):
+        def __init__(self, pos, respos, type):
             self.respos = respos
             self.type = type
-            # тут я допишу обращение к полю
+            self.pos = pos
+            self.res_stats = board[respos[1]][respos[0]]
 
         def return_status(self):
-            # это мне надо дописать исходя из обращения к полю в иницилизации
-            pass
+            return self.res_stats
 
         def update(self):
-            pass
-            # допишу
+            board[self.pos[1]][self.pos[0]][1] -= 1
+            board[self.respos[1]][self.respos[0]][1] += 1
+            # немного подправить
 
 
     class Tube:
         def __init__(self, pos):
             self.pos = pos
+            #еще доделываю проверку, не успел дописать
+
             # тут я также когда доделаю обращение к полю обхожу четыре клетки и запоминаю координаты первой найденной трубы
 
         def orientation(self):
@@ -125,7 +134,7 @@ if __name__ == '__main__':
             pass
 
 
-    board = Board(1000, 1000)
+    mainboard = Board(1000, 1000)
     running = True
     while running:
         for event in pygame.event.get():
@@ -134,7 +143,7 @@ if __name__ == '__main__':
             # if event.type == pygame.MOUSEBUTTONDOWN:
             #    board.get_click(event.pos)
         screen.fill((0, 0, 0))
-        board.render(screen)
+        mainboard.render(screen)
         pygame.display.flip()
 
     pygame.quit()
