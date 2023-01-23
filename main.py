@@ -1,11 +1,12 @@
 import pygame
 import os
 import sys
-from main_wind import Resource, CONVERTER
+from Design.pgm import CONVERTER, GENERATOR
+from Units.project_cell_stuff import Resource
 import random
 import csv
 pygame.font.init()
-font_loc = os.path.join(os.getcwd(), 'Design (by Egor)', 'PressStart2P-Regular.ttf')
+font_loc = os.path.join(os.getcwd(), 'Design', 'PressStart2P-Regular.ttf')
 header = pygame.font.Font(font_loc, 20)
 subheader = pygame.font.Font(font_loc, 15)
 main_text = pygame.font.Font(font_loc, 10)
@@ -22,7 +23,7 @@ pygame.display.set_caption(game_name)
 
 
 def load_image(name, colorkey=None):
-    fullname = os.path.join(os.getcwd(), 'Design (by Egor)', name)
+    fullname = os.path.join(os.getcwd(), 'Design', name)
     # если файл не существует, то выходим
     if not os.path.isfile(fullname):
         print(f"Файл с изображением '{fullname}' не найден")
@@ -38,11 +39,12 @@ def load_image(name, colorkey=None):
     return image
 
 
-image = load_image('Big_logo.png')
+image = load_image('20.png')
 
 
 class Window():
     def __init__(self) -> None:
+        self.titles = ["Фабрика", "Шахта", "Труба"]
         self.start_screen()
 
     def terminate(self):
@@ -74,7 +76,7 @@ class Window():
         screen.blit(year, year_rect)
 
     def generate_board(self):
-        board = [[Resource((i, j), CONVERTER['forest'], 5000) for i in range(1000)] for j in range(1000)]
+        board = [[Resource((i, j), CONVERTER['Уголь'], 5000) for i in range(1000)] for j in range(1000)]
         return board
 
     def bubble_window(self, data:dict):
@@ -99,7 +101,6 @@ class Window():
         pygame.display.flip()
         
     def left_panel(self, screen: pygame.Surface, pan_status: list=[False, False, False, False]):
-        self.titles = ["Фабрика", "Шахта", "Труба"]
         panels = list()
         pan_height, pan_width = (HEIGHT - 50) // len(self.titles), WIDTH - HEIGHT + 80
         for i in range(len(self.titles)):
@@ -147,7 +148,7 @@ class Window():
         l, d = 490, 490
         r, u = 510, 510
         ticker = 0
-        pan_status = [False, False, False, False]
+        pan_status = [False for _ in range(len(self.titles))]
         pan_chosen = '0'
         while True:
             koef = (r - l) // 20 + 1
@@ -166,7 +167,7 @@ class Window():
                     if WIDTH - square_side - 10 <= x <= WIDTH - 10 and HEIGHT - 40 - square_side <= y <= HEIGHT - 40:
                         length = r - l
                         self.base_size = square_side // length + 1
-                        self.bubble_window(self.board[(y - HEIGHT + 40) // self.base_size + u][(x - WIDTH + 10) // self.base_size + l].status())
+                        self.bubble_window(self.board[(y - HEIGHT + 40) // self.base_size + u][(x - WIDTH + 10) // self.base_size + l].return_status())
                     elif 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 50:
                         which_pan = (y - 10) // ((HEIGHT - 50) // 3)
                         pan_status[which_pan] = True
@@ -194,11 +195,11 @@ class Window():
                     if 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 50:
                         which_pan = (y - 10) // ((HEIGHT - 50) // 3)
                         pan_status[which_pan] = True
-                        for pan in range(len(pan_status)):
+                        for pan in range(len(self.titles)):
                             if pan != which_pan and  pan != pan_chosen:
                                 pan_status[pan] = False
                     else:
-                        pan_status = [False, False, False, False, False]
+                        pan_status = [False for _ in range(len(self.titles))]
                         if type(pan_chosen) == int:
                             pan_status[pan_chosen] = True
                 elif event.type == UPDATER:
@@ -210,13 +211,14 @@ class Window():
             self.copyright(screen)
             length = r - l
             self.base_size = square_side // length + 1
+            square.fill(back_color)
             for line in range(d, u):
                 for column in range(l, r):
                     unit = self.board[line][column]
                     '''if unit.type() == CONVERTER['resource']:
-                        image = load_image(f'.\Design (by Egor)\{unit.resource()}.png')
+                        image = load_image(f'.\Design\{unit.resource()}.png')
                     else:
-                        image = load_image(f'.\Design (by Egor)\{unit.type()}.png')'''
+                        image = load_image(f'.\Design\{unit.type()}.png')'''
                     color = (255 // (column - l + 1), 255 // (u - line), 100)
                     length = r - l
                     self.base_size = square_side // length + 1
