@@ -2,7 +2,7 @@ import pygame
 import os
 import sys
 from Design.pgm import CONVERTER, GENERATOR
-from Units.project_cell_stuff import Resource
+from Units.project_cell_stuff import *
 import random
 import csv
 pygame.font.init()
@@ -10,7 +10,7 @@ font_loc = os.path.join(os.getcwd(), 'Design', 'PressStart2P-Regular.ttf')
 header = pygame.font.Font(font_loc, 20)
 subheader = pygame.font.Font(font_loc, 15)
 main_text = pygame.font.Font(font_loc, 10)
-game_name = 'Laboratorio'
+game_name = 'Labtrix'
 
 text_color = pygame.Color('black')
 back_color = pygame.Color('#784315')
@@ -44,7 +44,8 @@ image = load_image('20.png')
 
 class Window():
     def __init__(self) -> None:
-        self.titles = ["Фабрика", "Шахта", "Труба"]
+        self.titles = ["Конструктор", "Бур", "Труба"]
+        self.images = [load_image(f'{i + 1}.png') for i in range(21)]
         self.start_screen()
 
     def terminate(self):
@@ -76,8 +77,17 @@ class Window():
         screen.blit(year, year_rect)
 
     def generate_board(self):
-        board = [[Resource((i, j), CONVERTER['Уголь'], 5000) for i in range(1000)] for j in range(1000)]
-        return board
+        length = 1000
+        one_part = length ** 2 // 25
+        units = list()
+        units.extend([CONVERTER['Песок']] * 15 * one_part)
+        units.extend([CONVERTER['Медь-Песок']] * 4 * one_part)
+        units.extend([CONVERTER['Железо-Песок']] * 4 * one_part)
+        units.extend([CONVERTER['Вода']] * 1 * one_part)
+        units.extend([CONVERTER['Уголь-Песок']] * 1 * one_part)
+        random.shuffle(units)
+        return [[Resource((i, j), units[length * j + i], 5000) for i in range(length)] for j in range(length)]
+
 
     def bubble_window(self, data:dict):
         while pygame.event.wait().type not in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
@@ -100,7 +110,7 @@ class Window():
         screen.fill(back_color)
         pygame.display.flip()
         
-    def left_panel(self, screen: pygame.Surface, pan_status: list=[False, False, False, False]):
+    def left_panel(self, screen: pygame.Surface, pan_status: list=[False * 15]):
         panels = list()
         pan_height, pan_width = (HEIGHT - 50) // len(self.titles), WIDTH - HEIGHT + 80
         for i in range(len(self.titles)):
@@ -117,10 +127,13 @@ class Window():
             rectangle.x = 10
             a.blit(string_rendered, rectangle)
 
-            image1 = pygame.transform.scale(image, (pan_height, pan_height))
+            image1 = pygame.transform.scale(self.images[CONVERTER[self.titles[i]] - 1 if i != 2 else 9], (pan_height, pan_height))
             a.blit(image1, (pan_width - pan_height, 0))
 
             screen.blit(a, (0, i * pan_height + 10))
+
+    def decider(self, pan_chosen):
+        pass
 
     def main_window(self, isNew=True):
         screen.fill(back_color)
@@ -167,9 +180,14 @@ class Window():
                     if WIDTH - square_side - 10 <= x <= WIDTH - 10 and HEIGHT - 40 - square_side <= y <= HEIGHT - 40:
                         length = r - l
                         self.base_size = square_side // length + 1
-                        self.bubble_window(self.board[(y - HEIGHT + 40) // self.base_size + u][(x - WIDTH + 10) // self.base_size + l].return_status())
+                        unit = self.board[(y - HEIGHT + 40) // self.base_size + u][(x - WIDTH + 10) // self.base_size + l]
+                        if pan_chosen == '0':
+                            self.bubble_window(unit.return_status())
+                        else:
+                            self.board[(y - HEIGHT + 40) // self.base_size + u][(x - WIDTH + 10) // self.base_size + l] = self.decider(pan_chosen)
+                            
                     elif 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 50:
-                        which_pan = (y - 10) // ((HEIGHT - 50) // 3)
+                        which_pan = (y - 10) // ((HEIGHT - 50) // len(self.titles))
                         pan_status[which_pan] = True
                         if which_pan == pan_chosen:
                             pan_chosen = '0'
@@ -193,7 +211,7 @@ class Window():
                 elif event.type == pygame.MOUSEMOTION:
                     x, y = event.pos
                     if 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 50:
-                        which_pan = (y - 10) // ((HEIGHT - 50) // 3)
+                        which_pan = (y - 10) // ((HEIGHT - 50) // len(self.titles))
                         pan_status[which_pan] = True
                         for pan in range(len(self.titles)):
                             if pan != which_pan and  pan != pan_chosen:
@@ -215,10 +233,10 @@ class Window():
             for line in range(d, u):
                 for column in range(l, r):
                     unit = self.board[line][column]
-                    '''if unit.type() == CONVERTER['resource']:
-                        image = load_image(f'.\Design\{unit.resource()}.png')
+                    if type(unit) == Resource:
+                        image = self.images[unit.type - 1]
                     else:
-                        image = load_image(f'.\Design\{unit.type()}.png')'''
+                        image = self.images[unit.type - 1]
                     color = (255 // (column - l + 1), 255 // (u - line), 100)
                     length = r - l
                     self.base_size = square_side // length + 1
@@ -234,7 +252,8 @@ class Window():
     def start_screen(self, back_name=None):
         intro_text = [f"Добро пожаловать в {game_name}", "",
                     "Начать новую игру",
-                    "Продолжить играть"]
+                    "Продолжить играть", "", "",
+                    "Подстановка"]
         if back_name:
             fon = pygame.transform.scale(load_image(back_name), (WIDTH, HEIGHT))
             screen.blit(fon, (0, 0))
@@ -242,8 +261,11 @@ class Window():
             screen.fill(back_color)
         rects = list()
         text_coord = 50
-        for line in intro_text:
-            string_rendered = header.render(line, 1, text_color)
+        for line in range(len(intro_text)):
+            if line < 4:
+                string_rendered = header.render(intro_text[line], 1, text_color)
+            else:
+                string_rendered = subheader.render(intro_text[line], 1, text_color)
             rectangle = string_rendered.get_rect()
             text_coord += 10
             rectangle.top = text_coord
@@ -268,17 +290,20 @@ class Window():
                     running = False
                     self.main_window(True)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if 0 <= event.pos[0] - rects[-1].x <= rect.width and \
-                                0 <= event.pos[1] - rects[-1].y <= rect.height:
+                    if 0 <= event.pos[0] - rects[3].x <= rect.width and \
+                                0 <= event.pos[1] - rects[3].y <= rect.height:
                         running = False
                         self.main_window(False)
-                    elif 0 <= event.pos[0] - rects[-2].x <= rect.width and \
-                                0 <= event.pos[1] - rects[-2].y <= rect.height:
+                    elif 0 <= event.pos[0] - rects[2].x <= rect.width and \
+                                0 <= event.pos[1] - rects[2].y <= rect.height:
                         running = False
                         self.main_window(True)
             text_coord = 50
-            for line in intro_text:
-                string_rendered = header.render(line, 1, text_color)
+            for line in range(len(intro_text)):
+                if line < 4:
+                    string_rendered = header.render(intro_text[line], 1, text_color)
+                else:
+                    string_rendered = subheader.render(intro_text[line], 1, text_color)
                 rectangle = string_rendered.get_rect()
                 text_coord += 10
                 rectangle.top = text_coord
