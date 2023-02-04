@@ -45,12 +45,12 @@ class Window():
         self.titles = ["Конструктор", "Бур", "Труба"]
         self.images = [load_image(f'{i + 1}.png') for i in range(21)]
         self.tube_converter = {
-            [0, 1]: 9,
-            [2, 3]: 10,
-            [1, 3]: 11,
-            [0, 3]: 12,
-            [1, 2]: 13,
-            [0, 1]: 14
+            '01': 9,
+            '23': 10,
+            '13': 11,
+            '03': 12,
+            '12': 13,
+            '02': 14
         }
         self.start_screen()
 
@@ -319,7 +319,7 @@ class Window():
                                 if type(neighbor) != Resource:
                                     connected_objects.append(index)
                             if len(connected_objects) == 2:
-                                image = self.images[self.tube_converter[connected_objects] - 1]
+                                image = self.images[self.tube_converter[str(connected_objects[0]) + str(connected_objects[1])] - 1]
                         else:
                             image = self.images[unit.type - 1]
                     length = r - l
