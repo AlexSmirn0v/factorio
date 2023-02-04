@@ -40,13 +40,18 @@ def load_image(name, colorkey=None):
     return image
 
 
-image = load_image('20.png')
-
-
 class Window():
     def __init__(self) -> None:
         self.titles = ["Конструктор", "Бур", "Труба"]
         self.images = [load_image(f'{i + 1}.png') for i in range(21)]
+        self.tube_converter = {
+            [0, 1]: 9,
+            [2, 3]: 10,
+            [1, 3]: 11,
+            [0, 3]: 12,
+            [1, 2]: 13,
+            [0, 1]: 14
+        }
         self.start_screen()
 
     def terminate(self):
@@ -114,7 +119,36 @@ class Window():
             pygame.display.flip()
         screen.fill(back_color)
         pygame.display.flip()
-        
+
+    def status_panel(self, screen: pygame.Surface, error=None):
+        stat_pan_side = 60
+        stat_pan = pygame.Surface((self.square_side, stat_pan_side))
+        stat_pan.fill(back_color)
+        if not error:
+            r_icon = pygame.transform.scale(self.images[20], (stat_pan_side, stat_pan_side))
+            b_icon = pygame.transform.scale(self.images[19], (stat_pan_side, stat_pan_side))
+            stat_pan.blit(r_icon, (0, 0))
+            stat_pan.blit(b_icon, (self.square_side / 2, 0))
+            r_text = header.render(str(self.bulbs[0]), 1, text_color)
+            rectangle = r_text.get_rect()
+            rectangle.top = 20
+            rectangle.x = stat_pan_side + 5
+            stat_pan.blit(r_text, rectangle)
+
+            b_text = header.render(str(self.bulbs[1]), 1, text_color)
+            rectangle = b_text.get_rect()
+            rectangle.top = 20
+            rectangle.x = self.square_side / 2 + stat_pan_side + 5
+            stat_pan.blit(b_text, rectangle)
+        else:
+            string_rendered = subheader.render(self.titles[0], 1, text_color)
+            rectangle = string_rendered.get_rect()
+            rectangle.top = 5
+            rectangle.x = self.centered(rectangle.width, self.square_side)
+            stat_pan.blit(string_rendered, rectangle)
+
+        screen.blit(stat_pan, (WIDTH - self.square_side - 10, 5))
+
     def left_panel(self, screen: pygame.Surface, pan_status: list=[False * 15]):
         panels = list()
         pan_height, pan_width = (HEIGHT - 50) // len(self.titles), WIDTH - HEIGHT + 80
@@ -146,7 +180,7 @@ class Window():
                             self.board[y + 1][x],
                             self.board[y][x + 1],
                             self.board[y][x - 1]]:
-                if neighbor.type == 22:
+                if type(neighbor) == Tube:
                     resources.append(neighbor.resource)
             return Factory(pos, )
         elif building == 1: #Бур
@@ -159,11 +193,11 @@ class Window():
                             self.board[y + 1][x],
                             self.board[y][x + 1],
                             self.board[y][x - 1]]:
-                if neighbor.type == 22 or neighbor.type == 7 and not isDiscovered:
+                if type(neighbor) == Tube or type(neighbor) == Miner and not isDiscovered:
                     isDiscovered = True
                     #resource = neighbor.resource
                     tiles_pos = neighbor.tiles_pos
-                elif neighbor.type == 22 or neighbor.type == 7:
+                elif type(neighbor) == Tube or type(neighbor) == Miner:
                     return False
             return Tube(pos, tiles_pos, self.board)
 
@@ -188,8 +222,8 @@ class Window():
                             line.append(CONVERTER[int(temp_keep[0])](int(temp_keep[1]), int(temp_keep[2])))
                     self.board.append(line)
         
-        square_side = HEIGHT - 100
-        square = pygame.Surface((square_side, square_side))
+        self.square_side = HEIGHT - 100
+        square = pygame.Surface((self.square_side, self.square_side))
         square.fill(accent_color)
         l, d = 490, 490
         r, u = 510, 510
@@ -211,11 +245,11 @@ class Window():
                         l, r, d, u = l1, r1, d1, u1
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == pygame.BUTTON_LEFT:
                     x, y = event.pos
-                    if WIDTH - square_side - 10 <= x <= WIDTH - 10 and HEIGHT - 40 - square_side <= y <= HEIGHT - 40:
+                    if WIDTH - self.square_side - 10 <= x <= WIDTH - 10 and HEIGHT - 40 - self.square_side <= y <= HEIGHT - 40:
                         length = r - l
-                        self.base_size = square_side // length + 1
+                        self.base_size = self.square_side // length + 1
                         coord_y = d + (y - 60) // self.base_size
-                        coord_x = (x - WIDTH + 10 + square_side) // self.base_size + l
+                        coord_x = (x - WIDTH + 10 + self.square_side) // self.base_size + l
                         unit = self.board[coord_y][coord_x]
                         if pan_chosen == '0':
                             self.bubble_window(unit.return_status())
@@ -260,14 +294,15 @@ class Window():
                         for j in range(1000):
                             unit = self.board[i][j]
                             unit.update()
-                            if unit.type == 23:
+                            if type(unit) == Factory:
                                 for i in range(2):
                                     self.bulbs[i] += unit.get_colbs()[i]
                     ticker += 1
             self.left_panel(screen, pan_status)
+            self.status_panel(screen)
             self.copyright(screen)
             length = r - l
-            self.base_size = square_side // length + 1
+            self.base_size = self.square_side // length + 1
             square.fill(back_color)
             for line in range(d, u):
                 for column in range(l, r):
@@ -275,14 +310,25 @@ class Window():
                     if type(unit) == Resource:
                         image = self.images[unit.type - 1]
                     else:
-                        image = self.images[unit.type - 1]
+                        if type(unit) == Tube:
+                            connected_objects = list()
+                            for index, neighbor in enumerate([self.board[column - 1][line],
+                                            self.board[column + 1][line],
+                                            self.board[column][line + 1],
+                                            self.board[column][line - 1]]):
+                                if type(neighbor) != Resource:
+                                    connected_objects.append(index)
+                            if len(connected_objects) == 2:
+                                image = self.images[self.tube_converter[connected_objects] - 1]
+                        else:
+                            image = self.images[unit.type - 1]
                     length = r - l
-                    self.base_size = square_side // length + 1
+                    self.base_size = self.square_side // length + 1
                     image1 = pygame.transform.scale(image, (self.base_size, self.base_size))
                     coords = [column - l, length - u + line]
                     square.blit(image1, (coords[0] * self.base_size, coords[1] * self.base_size))
             
-            screen.blit(square, (WIDTH - square_side - 10, HEIGHT - 40 - square_side))
+            screen.blit(square, (WIDTH - self.square_side - 10, HEIGHT - 40 - self.square_side))
             pygame.display.flip()
             clock.tick(20)
 
