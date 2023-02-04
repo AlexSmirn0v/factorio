@@ -1,10 +1,11 @@
 import pygame
 import os
 import sys
-from Design.pgm import CONVERTER, GENERATOR
+from pgm import *
 from Units.project_cell_stuff import *
 import random
 import csv
+import sqlite3
 pygame.font.init()
 font_loc = os.path.join(os.getcwd(), 'Design', 'PressStart2P-Regular.ttf')
 header = pygame.font.Font(font_loc, 20)
@@ -49,6 +50,10 @@ class Window():
         self.start_screen()
 
     def terminate(self):
+        connect = sqlite3.connect(os.path.join('System', 'bulbs.db'))
+        connect.cursor().execute(f'''UPDATE bulbs SET value = {self.bulbs[0]} WHERE name = 'r' ''')
+        connect.cursor().execute(f'''UPDATE bulbs SET value = {self.bulbs[1]} WHERE name = 'b' ''')
+        connect.close()
         pygame.quit()
         sys.exit()
 
@@ -86,7 +91,7 @@ class Window():
         units.extend([CONVERTER['Вода']] * 1 * one_part)
         units.extend([CONVERTER['Уголь-Песок']] * 1 * one_part)
         random.shuffle(units)
-        return [[Resource((i, j), units[length * j + i], 5000) for i in range(length)] for j in range(length)]
+        return [[Resource((i, j), units[length * j + i], 5000, self) for i in range(length)] for j in range(length)]
 
 
     def bubble_window(self, data:dict):
@@ -127,13 +132,41 @@ class Window():
             rectangle.x = 10
             a.blit(string_rendered, rectangle)
 
-            image1 = pygame.transform.scale(self.images[CONVERTER[self.titles[i]] - 1 if i != 2 else 9], (pan_height, pan_height))
-            a.blit(image1, (pan_width - pan_height, 0))
+            image1 = pygame.transform.scale(self.images[CONVERTER[self.titles[i]] - 1 if i != 2 else 9], (pan_height - 40, pan_height - 40))
+            a.blit(image1, (pan_width - pan_height + 40, 20))
 
             screen.blit(a, (0, i * pan_height + 10))
 
-    def decider(self, pan_chosen):
-        pass
+    def decider(self, pan_chosen, pos):
+        x, y = pos
+        building = pan_chosen
+        if building == 0: #Конструктор
+            resources = list()
+            for neighbor in [self.board[y - 1][x],
+                            self.board[y + 1][x],
+                            self.board[y][x + 1],
+                            self.board[y][x - 1]]:
+                if neighbor.type == 22:
+                    resources.append(neighbor.resource)
+            return Factory(pos, )
+        elif building == 1: #Бур
+            if self.board[y][x].main_type == 0:
+                type = self.board[y][x].type
+                return Miner(pos, pos, type, self.board)
+        elif building == 2: #Труба
+            isDiscovered = False
+            for neighbor in [self.board[y - 1][x],
+                            self.board[y + 1][x],
+                            self.board[y][x + 1],
+                            self.board[y][x - 1]]:
+                if neighbor.type == 22 or neighbor.type == 7 and not isDiscovered:
+                    isDiscovered = True
+                    #resource = neighbor.resource
+                    tiles_pos = neighbor.tiles_pos
+                elif neighbor.type == 22 or neighbor.type == 7:
+                    return False
+            return Tube(pos, tiles_pos, self.board)
+
 
     def main_window(self, isNew=True):
         screen.fill(back_color)
@@ -165,6 +198,7 @@ class Window():
         pan_chosen = '0'
         while True:
             koef = (r - l) // 20 + 1
+            self.bulbs = [0, 0]
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.terminate()
@@ -180,11 +214,13 @@ class Window():
                     if WIDTH - square_side - 10 <= x <= WIDTH - 10 and HEIGHT - 40 - square_side <= y <= HEIGHT - 40:
                         length = r - l
                         self.base_size = square_side // length + 1
-                        unit = self.board[(y - HEIGHT + 40) // self.base_size + u][(x - WIDTH + 10) // self.base_size + l]
+                        coord_y = d + (y - 60) // self.base_size
+                        coord_x = (x - WIDTH + 10 + square_side) // self.base_size + l
+                        unit = self.board[coord_y][coord_x]
                         if pan_chosen == '0':
                             self.bubble_window(unit.return_status())
-                        else:
-                            self.board[(y - HEIGHT + 40) // self.base_size + u][(x - WIDTH + 10) // self.base_size + l] = self.decider(pan_chosen)
+                        elif self.decider(pan_chosen, (coord_x, coord_y)):
+                            self.board[coord_y][coord_x] = self.decider(pan_chosen, (coord_x, coord_y))
                             
                     elif 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 50:
                         which_pan = (y - 10) // ((HEIGHT - 50) // len(self.titles))
@@ -202,12 +238,11 @@ class Window():
                         l += koef
                         r += koef
                     elif event.key == pygame.K_DOWN and d - koef >= 0:
-                        d -= koef
-                        u -= koef
+                        d += koef
+                        u += koef
                     elif event.key == pygame.K_UP and u + koef <= 1000:
-                        d += koef 
-                        u += koef 
-                    print(l, r, d, u)
+                        d -= koef 
+                        u -= koef 
                 elif event.type == pygame.MOUSEMOTION:
                     x, y = event.pos
                     if 0 <= x <= WIDTH - HEIGHT + 80 and 10 <= y <= HEIGHT - 50:
@@ -223,7 +258,11 @@ class Window():
                 elif event.type == UPDATER:
                     for i in range(1000):
                         for j in range(1000):
-                            self.board[i][j].update(ticker)
+                            unit = self.board[i][j]
+                            unit.update()
+                            if unit.type == 23:
+                                for i in range(2):
+                                    self.bulbs[i] += unit.get_colbs()[i]
                     ticker += 1
             self.left_panel(screen, pan_status)
             self.copyright(screen)
@@ -237,13 +276,11 @@ class Window():
                         image = self.images[unit.type - 1]
                     else:
                         image = self.images[unit.type - 1]
-                    color = (255 // (column - l + 1), 255 // (u - line), 100)
                     length = r - l
                     self.base_size = square_side // length + 1
-                    imager = pygame.Surface((100, 100))
-                    imager.fill(pygame.Color(color))
                     image1 = pygame.transform.scale(image, (self.base_size, self.base_size))
-                    square.blit(image1, ((column - l) * self.base_size, (u - line - 1) * self.base_size))
+                    coords = [column - l, length - u + line]
+                    square.blit(image1, (coords[0] * self.base_size, coords[1] * self.base_size))
             
             screen.blit(square, (WIDTH - square_side - 10, HEIGHT - 40 - square_side))
             pygame.display.flip()
@@ -252,8 +289,22 @@ class Window():
     def start_screen(self, back_name=None):
         intro_text = [f"Добро пожаловать в {game_name}", "",
                     "Начать новую игру",
-                    "Продолжить играть", "", "",
-                    "Подстановка"]
+                    "Продолжить играть", 
+                    "", 
+                    "",
+                    "Для перемещения по игровому полю используйте стрелки",
+                    "Изменять масштаб поля можно колёсиком мыши",
+                    "",
+                    "Для того, чтобы построить сооружение, выберите его в левом меню",
+                    "Затем кликните на выбранную клетку поля",
+                    "",
+                    "Вам доступно несколько типов сооружений:",
+                    f"{', '.join(map(lambda x: x.lower(), self.titles))}.",
+                    "Буры отвечают за добычу ресурсов, трубы - за их транспортировку,",
+                    "а генераторы - за переработку ресурсов",
+                    "",
+                    "И помните - колбы правят миром!!!"
+                    ]
         if back_name:
             fon = pygame.transform.scale(load_image(back_name), (WIDTH, HEIGHT))
             screen.blit(fon, (0, 0))
