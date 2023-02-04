@@ -1,0 +1,34 @@
+import csv
+
+ans = 0
+
+board = [[[1, 0], [0, 0], [5, 4]],
+         [[0, 0], [0, 0]],
+         [[0, 0], [0, 0]],
+         [[0, 0], [0, 0]],
+         [[0, 0], [0, 0]]]
+newboard = []
+
+
+def encoder(matrix):
+    with open('matrix.csv', 'w', newline='', encoding="utf8") as csvfile:
+        writer = csv.writer(csvfile, delimiter=';')
+        for i in board:
+            writer.writerow(i)
+
+
+def decoder():
+    transit = []
+    with open('matrix.csv', 'r', newline='', encoding="utf8") as csvfile:
+        reader = csv.reader(csvfile, delimiter=';')
+        for row in reader:
+            for i in row:
+                transit.append(i)
+            newboard.append(transit)
+            transit = []
+
+
+encoder(board)
+decoder()
+print("------------")
+print(*newboard, sep='\n')
