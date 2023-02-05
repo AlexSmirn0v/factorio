@@ -1,5 +1,14 @@
 import pygame
+from pgm import GENERATOR
 from pgm import RECONVERTER
+
+# resource - pos, amount
+
+# factory - pos, minerpos, storage, producing
+
+# pipe - pos, storage, orientation
+
+# miner - pos, respos, resamount, storage(res/colbs)
 
 if __name__ == '__main__':
     pygame.init()
@@ -15,6 +24,7 @@ if __name__ == '__main__':
     resources = {
         "тут тип ресурс": "тут тип кол-во"
     }
+
 
 class Board:
     def __init__(self, width, height):
@@ -66,6 +76,8 @@ class Board:
     #    tmp_board = copy.deepcopy(self.board)
     #  for y in range(self.height):
     #      for x in range(self.width):
+
+
 #
 #          for i in range(-1, 2):
 #              for j in range(-1, 2):
@@ -79,24 +91,32 @@ class Resource:
         self.type = type
         self.pos = pos
         self.resamount = resamount
+        self.board = board
         self.status = {
             "Тип": RECONVERTER[self.type - 1].split('-')[0],
             "Позиция": self.pos,
             "Емкость": resamount
         }
+
     def return_status(self):
         return self.status
-    def empty(self):
-        pass
-        # изменяет текстурку когда ресурс исчерпан и делает обычной землей?
+
+    # def empty(self):
+    #    pass
+    #    # изменяет текстурку когда ресурс исчерпан и делает обычной землей?
+
     def update(self):
-        pass
+        self.board[self.pos[1]][self.pos[0]] = self.resamount
+
+
 class Factory:
     def __init__(self, pos, minerpos, type, board):
         self.main_type = 23
         self.miners = minerpos
         self.type = type
         self.pos = pos
+        self.completion = 0
+        self.board = board
         self.miner_stats1 = board[minerpos[1]][minerpos[0]]
         self.miner_stats = {
             "Тип": RECONVERTER[self.type - 1].split('-')[0],
@@ -104,12 +124,26 @@ class Factory:
             "Итоговое вещество": board[minerpos[1]][minerpos[0][1]],
             "Кол-во вещества": board[minerpos[1]][minerpos[0][2]]
         }
+        self.producing = GENERATOR[board[minerpos[1]][minerpos[0][1]] - 1].split("-")[0]
+        self.needs = GENERATOR[board[minerpos[1]][minerpos[0][1]] - 1].split()
+        self.total = 0
+        for i in self.needs:
+            self.total += i[1] # тут в зависимости от позиции кол ва материала в генераторе
+
     def return_status(self):
         return self.miner_stats
+
     def update(self):
-        board[self.miners[1]][self.miners[0]][0] -= 1
+        for element in self.needs:
+            board[self.miners[1]][self.miners[0]][3][element[0]] -= element[1]  # находит в хранилище майнера материал и вычитаем из него кол во материала смотря из генератора
+            self.completion += 1  # считаем можно сказать процент накопленных материалов для создания но нужно меня подправить в порядке значений в классаз то есть каким идет хранилище и словарь ли оно
+        if self.completion == self.total:
+            board[self.pos[1]][self.pos[0]][3][0] += 1 # все таки мне еще надо подумать чуток
+
     def get_colbs(self):
-        pass
+        return board[self.pos[1]][self.pos[0]][3][1] # ну как я в  начале написал порядок свойств клетов хранилище стоит на втором месте и колбы после материалов внутри так что так
+
+
 class Miner:
     def __init__(self, pos, respos, type, board):
         self.main_type = 7
@@ -117,18 +151,22 @@ class Miner:
         self.respos = respos
         self.type = type
         self.pos = pos
-        self.res_stats = board[respos[1]][respos[0]]
+        self.res_stats = board[respos[1]][respos[0]]  # вот тут он находит по расположению ресурса его статы ну конечно можно их отправлять майнеру но так же тоже можно
         self.status = {
             "Тип": RECONVERTER[self.type - 1].split('-')[0],
             "Позиция": self.pos,
             "Емкость": board[self.respos[1]][self.respos[0]][1],
             "Кол-во ресурса": board[self.pos[1]][self.pos[0]][1]
         }
+
     def return_status(self):
         return self.res_stats
+
     def update(self):
         board[self.pos[1]][self.pos[0]][1] += 1
         board[self.respos[1]][self.respos[0]][1] -= 1
+
+
 class Tube:
     def __init__(self, pos, tiles_pos, board):
         self.main_type = 22
@@ -142,6 +180,7 @@ class Tube:
                 i = -1
             else:
                 i += 1
+
     def orientation(self):
         return self.pos, self.tube_pos
 
